@@ -1,8 +1,9 @@
 const express=require("express")
-const {adminLogin}=require("../Controllers/adminController")
+const {adminLogin, getAllEnquiries, updateEnquiryStatus,getCustomers,getCustomerDetails,toggleCustomerBlock, getDashboard}=require("../Controllers/adminController")
 const {getCategories,createCategory,toggleCategory,updateCategory}=require("../Controllers/categoryController")
 const{createProduct,listProducts,updateProduct,toggleProduct}=require("../Controllers/productController")
 const upload=require("../Middleware/multer")
+const{getAllOrders}=require("../Controllers/orderController")
 const router=express.Router()
 
 router.post("/login",adminLogin)
@@ -31,5 +32,13 @@ router.put("/products/:id", upload.fields([
 ]),
 updateProduct)
 router.patch("/products/:id/toggle",toggleProduct)
+router.get("/orders",getAllOrders)
+router.get("/enquiries",getAllEnquiries)
+router.patch("/enquiries/:id/status",updateEnquiryStatus)
+router.get("/customers",  getCustomers);
+router.get("/customers/:id", getCustomerDetails);
+router.patch("/customers/:id/block",  toggleCustomerBlock);
+router.get("/dashboard",getDashboard)
 
 module.exports=router
+

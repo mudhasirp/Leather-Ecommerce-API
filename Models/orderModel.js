@@ -1,34 +1,18 @@
 const mongoose = require("mongoose");
-const { Schema } = mongoose;
 
-const orderItemSchema = new Schema(
-  {
-    productId: { type: Schema.Types.ObjectId, ref: "Product", required: true },
+const orderItemSchema = new mongoose.Schema({
+  productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
+  name: String,
+  image: String,
 
-    vendorId: { type: Schema.Types.ObjectId, ref: "Vendor", required: true },
+  price: Number,
+  qty: Number,
 
-    variantId: { type: Schema.Types.ObjectId },
+  size: String,
+  color: String,
+}, { _id: false });
 
-    name: String,
-    slug: String,
-    image: String,
-
-    price: { type: Number, required: true },
-    qty: { type: Number, required: true },
-
-    color: String,
-    size: String,
-    options: [{ name: String, value: String }],
-
-    // 💰 COMMISSION SPLIT (IMPORTANT)
-    adminCommission: { type: Number, required: true }, // platform share
-    vendorAmount: { type: Number, required: true }     // vendor net earning
-  },
-  { _id: false }
-);
-
-// address snapshot inside order
-const orderAddressSchema = new Schema(
+const orderAddressSchema = new mongoose.Schema(
   {
     fullName: String,
     phone: String,
@@ -42,36 +26,34 @@ const orderAddressSchema = new Schema(
   { _id: false }
 );
 
-const orderSchema = new Schema(
+const orderSchema = new mongoose.Schema(
   {
-    user: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-
-    addressId: { type: Schema.Types.ObjectId, ref: "Address" },
-    shippingAddress: orderAddressSchema,
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
 
     items: [orderItemSchema],
 
-    subtotal: { type: Number, required: true },
-    shipping: { type: Number, default: 0 },
-    tax: { type: Number, default: 0 },
-    total: { type: Number, required: true },
+    address: orderAddressSchema,
 
-    currency: { type: String, default: "INR" },
+    paymentMethod: {
+      type: String,
+      enum: ["COD", "UPI", "CARD"],
+      default: "COD",
+    },
+
+    subtotal: Number,
+    deliveryFee: Number,
+    totalAmount: Number,
 
     status: {
       type: String,
-      enum: ["pending", "confirmed", "shipped", "delivered", "cancelled", "refunded"],
-      default: "pending",
+      enum: ["Placed", "Confirmed", "Shipped", "Delivered", "Cancelled"],
+      default: "Placed",
     },
 
-    paymentMethod: { type: String, default: "cod" },
-    paymentStatus: {
-      type: String,
-      enum: ["pending", "paid", "failed", "refunded"],
-      default: "pending",
-    },
+    isPaid: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
+
 
 module.exports = mongoose.model("Order", orderSchema);

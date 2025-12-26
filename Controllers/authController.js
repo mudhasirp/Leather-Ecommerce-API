@@ -126,7 +126,8 @@ const loginUser = async (req, res) => {
         if (!email || !password) {
             return res.status(400).json({ message: "Email and password are required" })
         }
-        const user = await User.findOne({ email })
+        const user = await User.findOne({ email }).select("+password");
+        console.log(password,user)
         if (!user || !(await user.matchPassword(password))) {
             return res.status(401).json({ message: "Invalid credentials " })
         }

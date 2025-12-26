@@ -1,68 +1,56 @@
-// models/product.model.js
+
 const mongoose=require("mongoose")
 
-const variantSchema = new mongoose.Schema({
-  color: {
-    type: String,
+const unitVariantSchema = new mongoose.Schema({
+  label: {
+    type: String, // "250g", "500g", "1kg"
     required: true,
   },
-  size: {
-    type: String, // eg: XS, S, M, L, XL, "One Size"
+  weightInGrams: {
+    type: Number, // 250, 500, 1000
+    required: true,
+  },
+  price: {
+    type: Number,
     required: true,
   },
   stock: {
     type: Number,
     default: 0,
   },
-  price: {
-    type: Number, // if null → use main price
-    default: null,
-  },
-  image: {
-    type: [{ type: String }],
-  },
 });
-
 const productSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-
-    slug: { type: String, required: true, unique: true, lowercase: true },
+    slug: { type: String, required: true, unique: true },
 
     description: { type: String, required: true },
 
-    basePrice: { type: Number, required: true }, // replaces price
-
-   
-    gender: {
-      type: String,
-      required: true,
-      enum: ["Men", "Women", "Unisex"],
-    },
-
-
-    badges: [{ type: String, enum: ["New", "Bestseller", "Limited"] }],
-
-    mainImage: {
-      type: String,
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
       required: true,
     },
 
+    mainImage: { type: String, required: true },
     images: [{ type: String }],
-      category: { type: mongoose.Schema.Types.ObjectId, ref: "Category", required: true },
 
-    variants: [variantSchema], // <-- NEW FEATURE
+    unitVariants: [unitVariantSchema], // 🥕 weight-based
+
+    isOrganic: { type: Boolean, default: false },
+
+    pricePerKg: { type: Number }, // optional reference price
 
     isActive: { type: Boolean, default: true },
 
     soldCount: { type: Number, default: 0 },
+
+    badges: [{ type: String, enum: ["New", "Popular", "Organic"] }],
 
     tags: [{ type: String }],
 
   },
   { timestamps: true }
 );
-
 const Product=mongoose.model("Product",productSchema)
-
-module.exports =Product
+module.exports=Product

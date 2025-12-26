@@ -97,42 +97,43 @@ function buildVariantFromIncoming(v = {}, otherImages = []) {
 // controllers/productController.js (replace createProduct with this)
 const createProduct = async (req, res) => {
   try {
-    // debug: what arrived
-    console.log(">>> multer files keys:", Object.keys(req.files || {}));
-    console.log(">>> raw req.body keys:", Object.keys(req.body || {}));
-    console.log(">>> raw req.body.variants:", req.body.variants);
+    console.log("FILES:", Object.keys(req.files || {}));
+    console.log("BODY:", Object.keys(req.body || {}));
 
     const {
       name,
       description,
-      basePrice,
       category,
-      gender,
-      badges,
       tags,
-      variants: variantsRaw,
+      unitVariants: unitVariantsRaw,
       slug: incomingSlug,
+      isActive,
     } = req.body;
 
-    // basic validation
-    if (!name || !description || !basePrice || !category) {
-      return res.status(400).json({ success: false, message: "Missing required fields" });
+    /* ------------------ BASIC VALIDATION ------------------ */
+    if (!name || !description || !category) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, description and category are required",
+      });
     }
+
     if (!mongoose.isValidObjectId(category)) {
-      return res.status(400).json({ success: false, message: "Invalid category id" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid category id",
+      });
     }
 
-    // optional: ensure category exists
-    const cat = await Category.findById(category);
-    if (!cat) {
-      return res.status(404).json({ success: false, message: "Category not found" });
+    const categoryExists = await Category.findById(category);
+    if (!categoryExists) {
+      return res.status(404).json({
+        success: false,
+        message: "Category not found",
+      });
     }
 
-    if (!gender || !ALLOWED_GENDERS.includes(gender)) {
-      return res.status(400).json({ success: false, message: `gender is required and must be one of: ${ALLOWED_GENDERS.join(", ")}` });
-    }
-
-    // slug
+    /* ------------------ SLUG ------------------ */
     const slug = (incomingSlug || name)
       .toString()
       .trim()
@@ -140,86 +141,104 @@ const createProduct = async (req, res) => {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
 
-    // unique slug check
-    const exists = await Product.findOne({ slug });
-    if (exists) return res.status(409).json({ success: false, message: "Product slug already exists" });
-
-    // mainImage (required)
-    if (!req.files || !req.files.mainImage || !req.files.mainImage[0]) {
-      return res.status(400).json({ success: false, message: "mainImage file is required" });
+    const slugExists = await Product.findOne({ slug });
+    if (slugExists) {
+      return res.status(409).json({
+        success: false,
+        message: "Product already exists",
+      });
     }
-    const mainFile = req.files.mainImage[0];
-    const mainUpload = await uploadBufferToCloudinary(mainFile.buffer, `products/${slug}/main`);
-    const mainImageUrl = mainUpload?.secure_url || mainUpload?.url || "";
 
-    // gallery images (optional) -> store in product.images
-    const galleryImages = [];
-    if (req.files && Array.isArray(req.files.images)) {
+    /* ------------------ MAIN IMAGE (REQUIRED) ------------------ */
+    if (!req.files?.mainImage?.[0]) {
+      return res.status(400).json({
+        success: false,
+        message: "Main image is required",
+      });
+    }
+
+    const mainUpload = await uploadBufferToCloudinary(
+      req.files.mainImage[0].buffer,
+      `products/${slug}/main`
+    );
+
+    const mainImageUrl =
+      mainUpload?.secure_url || mainUpload?.url || "";
+
+    /* ------------------ EXTRA IMAGES (MAX 3) ------------------ */
+    const images = [];
+
+    if (Array.isArray(req.files?.images)) {
       for (let i = 0; i < req.files.images.length; i++) {
-        const f = req.files.images[i];
-        const r = await uploadBufferToCloudinary(f.buffer, `products/${slug}/gallery-${Date.now()}-${i}`);
-        galleryImages.push(r?.secure_url || r?.url || "");
+        const file = req.files.images[i];
+
+        const upload = await uploadBufferToCloudinary(
+          file.buffer,
+          `products/${slug}/gallery-${i}`
+        );
+
+        images.push(upload?.secure_url || upload?.url || "");
       }
     }
 
-    // variant images (optional) -> these are uploaded in one flat list by the client as "variantImages"
-    const variantImageUrls = [];
-    if (req.files && Array.isArray(req.files.variantImages)) {
-      for (let i = 0; i < req.files.variantImages.length; i++) {
-        const f = req.files.variantImages[i];
-        const r = await uploadBufferToCloudinary(f.buffer, `products/${slug}/variant-${Date.now()}-${i}`);
-        variantImageUrls.push(r?.secure_url || r?.url || "");
+    /* ------------------ UNIT VARIANTS ------------------ */
+    let unitVariants = [];
+
+    try {
+      const parsed =
+        typeof unitVariantsRaw === "string"
+          ? JSON.parse(unitVariantsRaw)
+          : unitVariantsRaw;
+
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        throw new Error("Invalid unit variants");
       }
+
+      unitVariants = parsed.map((u) => ({
+        label: String(u.label).trim(),
+        weightInGrams: Number(u.weightInGrams),
+        price: Number(u.price),
+        stock: Number(u.stock) || 0,
+      }));
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid unit variants data",
+      });
     }
 
-    // parse variants JSON - tolerant: accept array or JSON string
-    let parsedVariants = [];
-    if (variantsRaw) {
-      try {
-        const raw = typeof variantsRaw === "string" ? JSON.parse(variantsRaw) : variantsRaw;
-        if (!Array.isArray(raw)) throw new Error("variants must be an array");
-        // map incoming variant -> normalized variant with images[] using helper
-        parsedVariants = raw.map((v) => buildVariantFromIncoming(v, variantImageUrls));
-      } catch (err) {
-        console.error("variants parse error:", err);
-        return res.status(400).json({ success: false, message: "Invalid variants JSON" });
-      }
-    } else {
-      return res.status(400).json({ success: false, message: "At least one variant is required." });
-    }
+    /* ------------------ TAGS ------------------ */
+    const tagsArr = tags
+      ? String(tags)
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean)
+      : [];
 
-    // ensure at least one variant present
-    if (!Array.isArray(parsedVariants) || parsedVariants.length === 0) {
-      return res.status(400).json({ success: false, message: "At least one variant is required." });
-    }
-
-    // badges/tags normalization
-    const badgesArr = badges ? (Array.isArray(badges) ? badges : String(badges).split(",").map(s => s.trim()).filter(Boolean)) : [];
-    const tagsArr = tags ? (Array.isArray(tags) ? tags : String(tags).split(",").map(s => s.trim()).filter(Boolean)) : [];
-
-    // create product
+    /* ------------------ CREATE PRODUCT ------------------ */
     const product = await Product.create({
-      name: String(name).trim(),
+      name: name.trim(),
       slug,
       description,
-      basePrice: Number(basePrice),
       category,
-      gender,
-      badges: badgesArr,
       mainImage: mainImageUrl,
-      images: galleryImages,        // gallery images
-      variants: parsedVariants,     // **each variant has `image` array per your schema**
-      isActive: req.body.isActive === "false" ? false : true,
+      images,              // max 3
+      unitVariants,        // weight-based
       tags: tagsArr,
+      isActive: isActive !== "false",
       soldCount: 0,
     });
 
-    console.log("Created product id:", product._id, "variants:", parsedVariants.map(v => ({ color: v.color, imagesCount: Array.isArray(v.images) ? v.images.length : (Array.isArray(v.image) ? v.image.length : 0) })));
-
-    return res.status(201).json({ success: true, product });
+    return res.status(201).json({
+      success: true,
+      product,
+    });
   } catch (err) {
     console.error("createProduct error:", err);
-    return res.status(500).json({ success: false, message: "Server error" });
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 };
 
@@ -259,123 +278,130 @@ const getProduct = async (req, res) => {
 
 
 const updateProduct = async (req, res) => {
-  const { id } = req.params;
-  if (!mongoose.isValidObjectId(id)) return res.status(400).json({ success: false, message: "Invalid id" });
-
   try {
-    const p = await Product.findById(id);
-    if (!p) return res.status(404).json({ success: false, message: "Not found" });
-     
-    // update base fields
-    if (req.body.name) p.name = req.body.name.trim();
-    if (req.body.description) p.description = req.body.description;
-    if (req.body.basePrice) p.basePrice = Number(req.body.basePrice);
-     if (req.body.category) {
-  const newCat = req.body.category;
-  if (!mongoose.isValidObjectId(newCat)) {
-    return res.status(400).json({ success: false, message: "Invalid category id" });
-  }
-  const cat = await Category.findById(newCat);
-  if (!cat) return res.status(404).json({ success: false, message: "Category not found" });
-  p.category = newCat;
-}
+    const { id } = req.params;
+    console.log(id)
 
-    // gender update (validate)
-    if (typeof req.body.gender !== "undefined") {
-      if (!ALLOWED_GENDERS.includes(req.body.gender)) {
-        return res.status(400).json({ success: false, message: `gender must be one of: ${ALLOWED_GENDERS.join(", ")}` });
-      }
-      p.gender = req.body.gender;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Invalid product ID" });
     }
 
-    if (req.body.badges) p.badges = Array.isArray(req.body.badges) ? req.body.badges : String(req.body.badges).split(",").map(s => s.trim()).filter(Boolean);
-    if (req.body.tags) p.tags = Array.isArray(req.body.tags) ? req.body.tags : String(req.body.tags).split(",").map(s => s.trim()).filter(Boolean);
-    if (typeof req.body.isActive !== "undefined") p.isActive = req.body.isActive === "false" ? false : Boolean(req.body.isActive);
-
-    // replace mainImage if provided
-    if (req.files && req.files.mainImage && req.files.mainImage[0]) {
-      const f = req.files.mainImage[0];
-      const result = await uploadBufferToCloudinary(f.buffer, `products/${p.slug}/main`);
-      p.mainImage = result?.secure_url || result?.url || p.mainImage;
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({ success: false, message: "Product not found" });
     }
 
-    // handle removeImages (array of remote URLs marked for deletion)
-    let removeImages = [];
-    if (req.body.removeImages) {
-      try {
-        removeImages = typeof req.body.removeImages === "string" ? JSON.parse(req.body.removeImages) : req.body.removeImages;
-        if (!Array.isArray(removeImages)) removeImages = [];
-      } catch (err) {
-        removeImages = [];
-      }
+    const {
+      name,
+      description,
+      category,
+      tags,
+      unitVariants,
+      isActive,
+    } = req.body;
+
+    /* ---------------- BASIC VALIDATION ---------------- */
+    if (!name || !description || !category) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, description and category are required",
+      });
     }
 
-    if (removeImages.length > 0) {
-      // best-effort delete from cloudinary and remove from product.images and variants
-      for (const url of removeImages) {
-        try {
-          await deleteRemoteImageByUrl(url);
-        } catch (e) {
-          console.warn("failed to delete remote image", url, e?.message || e);
-        }
-      }
-
-      // remove references from p.images
-      p.images = (p.images || []).filter((u) => !removeImages.includes(u));
-
-      // remove references inside variants' images arrays (if you store them)
-      if (Array.isArray(p.variants) && p.variants.length) {
-        p.variants = p.variants.map((vv) => {
-          if (Array.isArray(vv.images) && vv.images.length) {
-            return { ...vv, images: vv.images.filter((u) => !removeImages.includes(u)) };
-          }
-          return vv;
-        });
-      }
+    if (!mongoose.isValidObjectId(category)) {
+      return res.status(400).json({ success: false, message: "Invalid category" });
     }
 
-    // Upload new gallery images if provided -> these will replace p.images
-    // Note: we support replacing p.images entirely with newly uploaded images if req.files.images provided.
-    let newImages = null;
-    if (req.files && req.files.images) {
-      newImages = [];
+    const categoryExists = await Category.findById(category);
+    if (!categoryExists) {
+      return res.status(404).json({ success: false, message: "Category not found" });
+    }
+
+    /* ---------------- SLUG ---------------- */
+    const slug = name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+
+    /* ---------------- MAIN IMAGE ---------------- */
+    if (req.files?.mainImage?.[0]) {
+      const uploaded = await uploadBufferToCloudinary(
+        req.files.mainImage[0].buffer,
+        `products/${slug}/main`
+      );
+      product.mainImage = uploaded.secure_url || uploaded.url;
+    }
+
+    /* ---------------- EXTRA IMAGES ---------------- */
+    let newImages = [];
+    if (req.files?.images?.length) {
       for (let i = 0; i < req.files.images.length; i++) {
         const f = req.files.images[i];
-        const result = await uploadBufferToCloudinary(f.buffer, `products/${p.slug}/image-${Date.now()}-${i}`);
-        newImages.push(result?.secure_url || result?.url || "");
-      }
-      // replace p.images with newImages
-      p.images = newImages;
-    }
-
-    // parse & set variants if provided
-    if (req.body.variants) {
-      try {
-        const parsed = typeof req.body.variants === "string" ? JSON.parse(req.body.variants) : req.body.variants;
-        if (Array.isArray(parsed)) {
-          // Determine sourceImages for mapping imageIndices:
-          // prefer newly uploaded images (newImages) otherwise current p.images
-          const sourceImages = Array.isArray(newImages) ? newImages : (Array.isArray(p.images) ? p.images : []);
-          const mapped = parsed.map(v => buildVariantFromIncoming(v, sourceImages));
-          if (!Array.isArray(mapped) || mapped.length === 0) {
-            return res.status(400).json({ success: false, message: "At least one variant is required." });
-          }
-          p.variants = mapped;
-        } else {
-          return res.status(400).json({ success: false, message: "Invalid variants payload" });
-        }
-      } catch (err) {
-        return res.status(400).json({ success: false, message: "Invalid variants JSON" });
+        const uploaded = await uploadBufferToCloudinary(
+          f.buffer,
+          `products/${slug}/gallery-${Date.now()}-${i}`
+        );
+        newImages.push(uploaded.secure_url || uploaded.url);
       }
     }
 
-    await p.save();
-    return res.json({ success: true, product: p });
+    // Replace gallery if new ones uploaded
+    if (newImages.length > 0) {
+      product.images = newImages;
+    }
+
+    /* ---------------- VARIANTS ---------------- */
+    let parsedVariants = [];
+    if (unitVariants) {
+      const parsed =
+        typeof unitVariants === "string"
+          ? JSON.parse(unitVariants)
+          : unitVariants;
+
+      parsed.forEach((v) => {
+        if (!v.label || !v.price) return;
+
+        parsedVariants.push({
+          label: v.label,
+          weightInGrams: Number(v.weightInGrams),
+          price: Number(v.price),
+          stock: Number(v.stock || 0),
+        });
+      });
+    }
+
+    if (!parsedVariants.length) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one variant is required",
+      });
+    }
+
+    /* ---------------- UPDATE DOCUMENT ---------------- */
+    product.name = name;
+    product.slug = slug;
+    product.description = description;
+    product.category = category;
+    product.tags = tags ? tags.split(",").map(t => t.trim()) : [];
+    product.unitVariants = parsedVariants;
+    product.isActive = isActive !== false;
+
+    await product.save();
+
+    return res.json({
+      success: true,
+      product,
+    });
   } catch (err) {
-    console.error("updateProduct error:", err);
-    return res.status(500).json({ success: false, message: "Server error" });
+    console.error("UPDATE PRODUCT ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 };
+
 
 /**
  * Toggle product active flag

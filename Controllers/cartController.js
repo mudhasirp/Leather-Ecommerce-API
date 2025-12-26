@@ -15,28 +15,60 @@ const getCart = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
-
 const addItem = async (req, res) => {
   try {
     const userId = req.user?.id;
-    console.log(req.user)
-    if (!userId)
-      return res.status(401).json({ success: false, message: "Unauthorized" });
+    console.log("ADD TO CART BODY:", req.body);
 
-    const { productId, variantId, qty = 1, price, name, slug, image, size, color, options } = req.body;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
 
+    const {
+      productId,
+      unitLabel,
+      unitWeight,
+      qty = 1,
+      price,
+      name,
+      slug,
+      image,
+    } = req.body;
 
-    if (!productId || price == null)
-      return res.status(400).json({ success: false, message: "productId + price required" });
+    // 🔐 STRICT VALIDATION (matches cart schema)
+    if (!productId || !unitLabel || !unitWeight || price == null) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid unit for vegetable",
+      });
+    }
 
     const cart = await Cart.findOrCreateFor({ userId });
 
-    await cart.addItem({ productId, variantId, qty, price, name, slug, image ,size,color});
+    await cart.addItem({
+      productId,
+      unitLabel,
+      unitWeight,
+      qty,
+      price,
+      name,
+      slug,
+      image,
+    });
 
-    return res.json({ success: true, cart });
+    return res.json({
+      success: true,
+      cart,
+    });
   } catch (err) {
-    console.error("addItem error:", err);
-    return res.status(500).json({ success: false, message: err.message });
+    console.error("addItem error:", err.message);
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 
@@ -79,6 +111,7 @@ const removeItem = async (req, res) => {
 const clearCart = async (req, res) => {
   try {
     const userId = req.user?.id;
+        console.log("cart is",userId)
 
     if (!userId)
       return res.status(401).json({ success: false, message: "Unauthorized" });

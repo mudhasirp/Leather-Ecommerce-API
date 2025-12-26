@@ -1,26 +1,23 @@
 const mongoose= require("mongoose")
 const {Schema}=mongoose
-const cartItemSchema = new Schema(
-  {
-    productId: { type: Schema.Types.ObjectId, ref: "Product", required: true },
-    variantId: { type: Schema.Types.ObjectId, required: false }, // optional if your variant is not separate collection
-    name: { type: String, required: true }, // snapshot
-    slug: { type: String, required: false },
-    image: { type: String, required: false }, // snapshot (main or variant image)
-    qty: { type: Number, required: true, default: 1, min: 1 },
-    price: {
-      type: Number,
-      required: true,
-    },
-   
-    addedAt: { type: Date, default: Date.now },
-    color: { type: String, required: false, default: "" },
-    size: { type: String, required: false, default: "" },
-    options: { type: [{ name: String, value: String }], default: [] },
+const cartItemSchema = new Schema({
+  productId: { type: Schema.Types.ObjectId, ref: "Product", required: true },
 
-  },
-  { _id: true }
-);
+  // 🥕 VEGETABLE-SPECIFIC
+  unitLabel: { type: String, required: true },       // "500 g"
+  unitWeight: { type: Number, required: true },      // 500 (grams)
+
+  // snapshots
+  name: { type: String, required: true },
+  slug: { type: String },
+  image: { type: String },
+
+  qty: { type: Number, required: true, min: 1 },
+  price: { type: Number, required: true },
+
+  addedAt: { type: Date, default: Date.now },
+});
+
 
 const cartSchema = new Schema(
   {
@@ -51,55 +48,35 @@ cartSchema.methods.recalculate = function () {
 // Instance methods
 //
 
-/**
- * Add an item snapshot to the cart (or increment qty if same product+variant exists).
- * itemSnapshot must contain: { productId, price, qty (optional), name, slug, image, variantId (optional) }
- */
-// replace your existing cartSchema.methods.addItem with this
-
 cartSchema.methods.addItem = async function (itemSnapshot) {
-  if (!itemSnapshot || !itemSnapshot.productId || typeof itemSnapshot.price === "undefined") {
-    throw new Error("Invalid item snapshot: productId and price required");
+  if (
+    !itemSnapshot.productId ||
+    !itemSnapshot.unitLabel ||
+    !itemSnapshot.unitWeight
+  ) {
+    throw new Error("Invalid vegetable item");
   }
 
-  const productId = String(itemSnapshot.productId);
-  const variantId = itemSnapshot.variantId ? String(itemSnapshot.variantId) : null;
-  const sizeSnap = itemSnapshot.size ? String(itemSnapshot.size) : "";
-  const colorSnap = itemSnapshot.color ? String(itemSnapshot.color) : "";
-
-  // find existing line that matches product + variant + size + color
-  const existingIndex = this.items.findIndex((it) => {
-    const sameProduct = String(it.productId) === productId;
-    const sameVariant = variantId ? String(it.variantId) === variantId : !it.variantId;
-    const sameSize = (it.size || "") === sizeSnap;
-    const sameColor = (it.color || "") === colorSnap;
-    return sameProduct && sameVariant && sameSize && sameColor;
-  });
+  const existingIndex = this.items.findIndex(
+    (it) =>
+      String(it.productId) === String(itemSnapshot.productId) &&
+      it.unitLabel === itemSnapshot.unitLabel
+  );
 
   if (existingIndex >= 0) {
-    const line = this.items[existingIndex];
-    line.qty = Number(line.qty || 0) + Number(itemSnapshot.qty || 1);
-    // update snapshot fields in case price/image/name changed
-    line.price = Number(itemSnapshot.price);
-    if (itemSnapshot.name) line.name = itemSnapshot.name;
-    if (itemSnapshot.slug) line.slug = itemSnapshot.slug;
-    if (itemSnapshot.image) line.image = itemSnapshot.image;
-    // update new snapshots as well
-    if (typeof itemSnapshot.size !== "undefined") line.size = itemSnapshot.size;
-    if (typeof itemSnapshot.color !== "undefined") line.color = itemSnapshot.color;
-    if (Array.isArray(itemSnapshot.options) && itemSnapshot.options.length) line.options = itemSnapshot.options;
+    this.items[existingIndex].qty += Number(itemSnapshot.qty || 1);
   } else {
     this.items.push({
       productId: itemSnapshot.productId,
-      variantId: itemSnapshot.variantId,
-      name: itemSnapshot.name || "",
-      slug: itemSnapshot.slug || "",
-      image: itemSnapshot.image || "",
+      name: itemSnapshot.name,
+      slug: itemSnapshot.slug,
+      image: itemSnapshot.image,
+
+      unitLabel: itemSnapshot.unitLabel,
+      unitWeight: itemSnapshot.unitWeight,
+
       qty: Number(itemSnapshot.qty || 1),
       price: Number(itemSnapshot.price),
-      size: itemSnapshot.size || "",
-      color: itemSnapshot.color || "",
-      options: Array.isArray(itemSnapshot.options) ? itemSnapshot.options : [],
     });
   }
 
@@ -107,6 +84,7 @@ cartSchema.methods.addItem = async function (itemSnapshot) {
   await this.save();
   return this;
 };
+
 
 
 /**

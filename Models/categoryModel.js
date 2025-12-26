@@ -20,12 +20,7 @@ const categorySchema = new Schema(
     },
 
     // 🔑 OWNER (Vendor)
-    vendorId: {
-      type: Schema.Types.ObjectId,
-      ref: "Vendor",
-      required: true,
-      index: true,
-    },
+    
 
     isActive: {
       type: Boolean,
