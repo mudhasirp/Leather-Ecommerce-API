@@ -1,28 +1,21 @@
-const nodemailer = require("nodemailer");
-//nodemailer for sending email
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,          
-  port: process.env.SMTP_PORT || 465,
-  secure: true,                         
-  auth: {
-    user: process.env.SMTP_USER,        
-    pass: process.env.SMTP_PASS,        
-  },
-});
+import { Resend } from "resend";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendEmail = async (to, subject, html) => {
   try {
-    await transporter.sendMail({
-      from: `"Leather Haven 👜" <${process.env.SMTP_USER}>`,
+    await resend.emails.send({
+      from: "Leather Haven <onboarding@resend.dev>",
       to,
       subject,
       html,
     });
 
-    console.log("📨 Mail sent to:", to);
+    console.log("📨 Email sent to:", to);
   } catch (error) {
-    console.error("❌ Email send failed:", error.message);
+    console.error("❌ Email failed:", error);
+    throw error;
   }
 };
 
-module.exports = sendEmail;
+export default sendEmail;
