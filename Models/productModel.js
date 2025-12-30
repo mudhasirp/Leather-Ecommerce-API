@@ -3,11 +3,11 @@ const mongoose=require("mongoose")
 
 const unitVariantSchema = new mongoose.Schema({
   label: {
-    type: String, // "250g", "500g", "1kg"
+    type: String, 
     required: true,
   },
   weightInGrams: {
-    type: Number, // 250, 500, 1000
+    type: Number, 
     required: true,
   },
   price: {

@@ -184,13 +184,12 @@ const toggleCustomerBlock = async (req, res) => {
 };
 const getDashboard = async (req, res) => {
   try {
-    console.log("starting")
+    const range = req.query.range || "month";
+
+    // ----- TOTAL COUNTS -----
     const totalUsers = await User.countDocuments({ role: "user" });
-    console.log("total users",totalUsers)
     const totalProducts = await Product.countDocuments();
-    console.log("total products",totalProducts)
-    console.log(totalUsers)
-    console.log(totalProducts)
+    const totalOrders = await Order.countDocuments();
 
     const revenueAgg = await Order.aggregate([
       { $match: { status: { $ne: "Cancelled" } } },
@@ -198,22 +197,36 @@ const getDashboard = async (req, res) => {
     ]);
 
     const totalRevenue = revenueAgg[0]?.total || 0;
-    console.log(totalRevenue)
 
-    const totalOrders = await Order.countDocuments();
+    // ----- DATE FORMAT BASED ON RANGE -----
+    let groupBy;
+    if (range === "week") {
+      groupBy = {
+        $dateToString: { format: "%a", date: "$createdAt" }, // Mon, Tue
+      };
+    } else if (range === "month") {
+      groupBy = {
+        $dateToString: { format: "%d %b", date: "$createdAt" }, // 01 Jan
+      };
+    } else {
+      groupBy = {
+        $dateToString: { format: "%b %Y", date: "$createdAt" }, // Jan 2025
+      };
+    }
 
-    /* SALES CHART (last 7 days) */
+    // ----- SALES GRAPH -----
     const salesChart = await Order.aggregate([
+      { $match: { status: { $ne: "Cancelled" } } },
       {
         $group: {
-          _id: { $dateToString: { format: "%d %b", date: "$createdAt" } },
+          _id: groupBy,
           revenue: { $sum: "$totalAmount" },
         },
       },
       { $sort: { _id: 1 } },
     ]);
 
-    /* TOP PRODUCTS */
+    // ----- TOP PRODUCTS -----
     const topProducts = await Order.aggregate([
       { $unwind: "$items" },
       {
@@ -229,12 +242,12 @@ const getDashboard = async (req, res) => {
       { $limit: 5 },
     ]);
 
-    /* RECENT ORDERS */
+    // ----- RECENT ORDERS -----
     const recentOrders = await Order.find()
+      .populate("userId", "name")
+      .populate("items.productId", "name")
       .sort({ createdAt: -1 })
-      .limit(10)
-      .select("_id totalAmount")
-      .lean();
+      .limit(10);
 
     res.json({
       success: true,
@@ -246,9 +259,11 @@ const getDashboard = async (req, res) => {
       topProducts,
       recentOrders,
     });
-  } catch (err) {
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Dashboard error" });
   }
 };
+
 
 module.exports = { adminLogin,getAllEnquiries,updateEnquiryStatus,getCustomers,getCustomerDetails,toggleCustomerBlock,getDashboard};

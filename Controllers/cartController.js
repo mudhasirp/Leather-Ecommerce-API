@@ -1,6 +1,6 @@
 const Cart=require("../Models/cartModel")
 const mongoose=require("mongoose")
-
+const Product=require("../Models/productModel")
 const getCart = async (req, res) => {
   try {
     const userId = req.user?.id;
@@ -17,60 +17,75 @@ const getCart = async (req, res) => {
 };
 const addItem = async (req, res) => {
   try {
-    const userId = req.user?.id;
-    console.log("ADD TO CART BODY:", req.body);
+    const userId = req.user.id;
+    console.log(req.body)
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
+    const { productId, unitLabel, qty } = req.body;
+
+    // Basic validation
+    if (!productId || !unitLabel || !qty || qty < 1) {
+      return res.status(400).json({ message: "Invalid request" });
+    }
+
+    // Fetch product
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    // Find correct unit
+    const unit = product.unitVariants.find(
+      (u) => u.label === unitLabel
+    );
+
+    if (!unit) {
+      return res.status(400).json({ message: "Invalid unit selected" });
+    }
+
+    // Extract trusted values
+    const unitWeight = unit.weightInGrams;
+    const price = unit.price;
+
+    // Find or create cart
+    let cart = await Cart.findOne({ user: userId });
+
+    if (!cart) {
+      cart = new Cart({ user: userId, items: [] });
+    }
+
+    // Check if same product + unit already exists
+    const existingItem = cart.items.find(
+      (item) =>
+        item.productId.toString() === productId &&
+        item.unitLabel === unitLabel
+    );
+
+    if (existingItem) {
+      existingItem.qty += qty;
+    } else {
+      cart.items.push({
+        productId,
+        name: product.name,
+        unitLabel,
+        unitWeight,
+        price,
+        qty,
+        image: product.mainImage,
       });
     }
 
-    const {
-      productId,
-      unitLabel,
-      unitWeight,
-      qty = 1,
-      price,
-      name,
-      slug,
-      image,
-    } = req.body;
+    await cart.save();
 
-    // 🔐 STRICT VALIDATION (matches cart schema)
-    if (!productId || !unitLabel || !unitWeight || price == null) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid unit for vegetable",
-      });
-    }
-
-    const cart = await Cart.findOrCreateFor({ userId });
-
-    await cart.addItem({
-      productId,
-      unitLabel,
-      unitWeight,
-      qty,
-      price,
-      name,
-      slug,
-      image,
-    });
-
-    return res.json({
+    return res.status(200).json({
       success: true,
       cart,
     });
   } catch (err) {
-    console.error("addItem error:", err.message);
-    return res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    console.error("Add to cart error:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 const updateItemQty = async (req, res) => {
   try {
