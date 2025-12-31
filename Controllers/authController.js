@@ -15,7 +15,6 @@ const sendOtp = async (req, res) => {
       return res.status(400).json({ message: "Email & purpose are required" });
     }
 
-    // 🔹 REGISTER FLOW
     if (purpose === "register") {
       if (!name || !password) {
         return res
@@ -29,7 +28,6 @@ const sendOtp = async (req, res) => {
       }
     }
 
-    // 🔹 RESET PASSWORD FLOW
     if (purpose === "reset") {
       const user = await User.findOne({ email });
 
@@ -37,7 +35,6 @@ const sendOtp = async (req, res) => {
         return res.status(400).json({ message: "User not found" });
       }
 
-      // ❗ Block pure Google accounts from using forgot password
       if (user.authProvider === "google" && !user.password) {
         return res.status(400).json({
           message:

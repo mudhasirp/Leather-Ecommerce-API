@@ -76,7 +76,7 @@ const createOrder = async (req, res) => {
         image: i.image,
         price: i.price,
         qty: i.qty,
-        unitLabel: i.unitLabel,
+        unitLabel: i.unitWeight,
       })),
       address,
       paymentMethod,
@@ -92,7 +92,7 @@ const createOrder = async (req, res) => {
       const unit = product.unitVariants.find(
         (u) => u.label === item.unitLabel
       );
-
+      
       unit.stock -= item.qty;
       await product.save();
     }
@@ -180,24 +180,21 @@ const createEnquiry = async (req, res) => {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    // ✅ get user
     const user = await User.findById(userId).select("name");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // ✅ get product
     const product = await Product.findById(productId).select("name mainImage");
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    // ✅ get default address (optional)
     const address = await Address.findOne({ user: userId, isDefault: true });
 
     const enquiry = await Enquiry.create({
       user: userId,
-      username: user.name,                // ✅ FIX
+      username: user.name,                
       userPhone: phone,
 
       userAddress: address

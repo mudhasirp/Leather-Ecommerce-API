@@ -31,7 +31,6 @@ const userSchema = new mongoose.Schema(
       enum: ["user", "admin"],
       default: "user",
     },
-    // User schema
 isBlocked: {
   type: Boolean,
   default: false,
@@ -40,9 +39,7 @@ isBlocked: {
   },
   { timestamps: true }
 );
-//for saving user with hashing password
 userSchema.pre("save", async function () {
-  // if password is not modified or doesn't exist, skip hashing
   if (!this.isModified("password") || !this.password) {
     return;
   }

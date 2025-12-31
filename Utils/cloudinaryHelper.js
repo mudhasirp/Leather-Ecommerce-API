@@ -1,4 +1,4 @@
-const cloudinary = require("../Config/cloudinary"); // adjust path!
+const cloudinary = require("../Config/cloudinary"); 
 const streamifier = require("streamifier");
 
 

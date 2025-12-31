@@ -35,11 +35,11 @@ const productSchema = new mongoose.Schema(
     mainImage: { type: String, required: true },
     images: [{ type: String }],
 
-    unitVariants: [unitVariantSchema], // 🥕 weight-based
+    unitVariants: [unitVariantSchema], 
 
     isOrganic: { type: Boolean, default: false },
 
-    pricePerKg: { type: Number }, // optional reference price
+    pricePerKg: { type: Number }, 
 
     isActive: { type: Boolean, default: true },
 

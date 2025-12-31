@@ -1,4 +1,3 @@
-// API/Controllers/addressController.js
 const Address = require("../Models/addressModel")
 
 
@@ -86,13 +85,11 @@ const setDefaultAddress = async (req, res) => {
     const userId = req.user.id;
     const { id } = req.params;
 
-    // unset previous default
     await Address.updateMany(
       { user: userId },
       { isDefault: false }
     );
 
-    // set new default
     const address = await Address.findOneAndUpdate(
       { _id: id, user: userId },
       { isDefault: true },

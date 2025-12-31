@@ -1,4 +1,3 @@
-// Utils/mailContentProvider.js
 
 const getOtpEmailHtml = ({ name, otp }) => {
   return `

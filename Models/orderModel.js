@@ -7,9 +7,7 @@ const orderItemSchema = new mongoose.Schema({
 
   price: Number,
   qty: Number,
-
-  size: String,
-  color: String,
+  unitLabel :Number,
 }, { _id: false });
 
 const orderAddressSchema = new mongoose.Schema(

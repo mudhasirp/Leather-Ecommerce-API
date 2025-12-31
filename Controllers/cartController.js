@@ -18,71 +18,86 @@ const getCart = async (req, res) => {
 const addItem = async (req, res) => {
   try {
     const userId = req.user.id;
-    console.log(req.body)
-
     const { productId, unitLabel, qty } = req.body;
+    console.log("started")
+    console.log(req.body)
+    console.log(typeof unitLabel)
 
-    // Basic validation
     if (!productId || !unitLabel || !qty || qty < 1) {
       return res.status(400).json({ message: "Invalid request" });
     }
 
-    // Fetch product
     const product = await Product.findById(productId);
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    // Find correct unit
     const unit = product.unitVariants.find(
       (u) => u.label === unitLabel
     );
-
+    console.log(unit)
+    
     if (!unit) {
-      return res.status(400).json({ message: "Invalid unit selected" });
+      return res.status(400).json({ message: "Invalid unit" });
     }
 
-    // Extract trusted values
-    const unitWeight = unit.weightInGrams;
-    const price = unit.price;
+    // 🔒 STOCK VALIDATION
+    if(unit.stock)
+    if (qty > unit.stock) {
+      return res.status(400).json({
+        message: `Only ${unit.stock} items available`
+      });
+    }
 
-    // Find or create cart
     let cart = await Cart.findOne({ user: userId });
 
     if (!cart) {
       cart = new Cart({ user: userId, items: [] });
     }
 
-    // Check if same product + unit already exists
     const existingItem = cart.items.find(
       (item) =>
         item.productId.toString() === productId &&
         item.unitLabel === unitLabel
     );
-
     if (existingItem) {
-      existingItem.qty += qty;
-    } else {
-      cart.items.push({
-        productId,
-        name: product.name,
-        unitLabel,
-        unitWeight,
-        price,
-        qty,
-        image: product.mainImage,
-      });
-    }
+  const totalQty = existingItem.qty + qty;
 
-    await cart.save();
+  if (totalQty > unit.stock) {
+    return res.status(400).json({
+      message: `Only ${unit.stock} items available`,
+    });
+  }
 
-    return res.status(200).json({
+  existingItem.qty = totalQty;
+} else {
+  if (qty > unit.stock) {
+    return res.status(400).json({
+      message: `Only ${unit.stock} items available`,
+    });
+  }
+
+  cart.items.push({
+    productId,
+    name: product.name,
+    unitLabel,
+    image:product.mainImage,
+    unitWeight: unit.weightInGrams,
+    price: unit.price,
+    qty,
+    stock: unit.stock
+  });
+} 
+await cart.save()
+   console.log("wro")
+    res.status(200).json({
       success: true,
       cart,
     });
+
   } catch (err) {
     console.error("Add to cart error:", err);
-    return res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 

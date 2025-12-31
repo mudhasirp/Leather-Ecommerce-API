@@ -19,7 +19,7 @@ const categorySchema = new Schema(
       default: "",
     },
 
-    // 🔑 OWNER (Vendor)
+    
     
 
     isActive: {
@@ -29,8 +29,6 @@ const categorySchema = new Schema(
   },
   { timestamps: true }
 );
-
-// 🔒 unique category name per vendor
 categorySchema.index({ name: 1, vendorId: 1 }, { unique: true });
 
 module.exports = mongoose.model("Category", categorySchema);

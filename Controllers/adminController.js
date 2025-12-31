@@ -37,7 +37,6 @@ const adminLogin = async (req, res) => {
 };
 
 
-/* GET ALL ENQUIRIES */
 const getAllEnquiries = async (req, res) => {
   try {
     const enquiries = await Enquiry.find()
@@ -51,7 +50,6 @@ const getAllEnquiries = async (req, res) => {
   }
 };
 
-/* UPDATE STATUS */
 const updateEnquiryStatus = async (req, res) => {
   try {
     const { status } = req.body;
@@ -122,19 +120,16 @@ const getCustomerDetails = async (req, res) => {
   try {
     const { id } = req.params;
 
-    /* ---------- USER ---------- */
     const user = await User.findById(id).select("name email createdAt isBlocked");
     if (!user) {
       return res.status(404).json({ message: "Customer not found" });
     }
 
-    /* ---------- DEFAULT ADDRESS ---------- */
     const defaultAddress = await Address.findOne({
       user: id,
       isDefault: true,
     });
 
-    /* ---------- ORDERS ---------- */
     const orders = await Order.find({ userId: id })
       .sort({ createdAt: -1 })
       .select("_id totalAmount status createdAt");
@@ -144,7 +139,6 @@ const getCustomerDetails = async (req, res) => {
       0
     );
 
-    /* ---------- ENQUIRIES ---------- */
     const enquiries = await Enquiry.find({ user: id })
       .sort({ createdAt: -1 })
       .select("product message status createdAt");
@@ -186,7 +180,6 @@ const getDashboard = async (req, res) => {
   try {
     const range = req.query.range || "month";
 
-    // ----- TOTAL COUNTS -----
     const totalUsers = await User.countDocuments({ role: "user" });
     const totalProducts = await Product.countDocuments();
     const totalOrders = await Order.countDocuments();
@@ -198,23 +191,23 @@ const getDashboard = async (req, res) => {
 
     const totalRevenue = revenueAgg[0]?.total || 0;
 
-    // ----- DATE FORMAT BASED ON RANGE -----
     let groupBy;
     if (range === "week") {
       groupBy = {
-        $dateToString: { format: "%a", date: "$createdAt" }, // Mon, Tue
+        $dateToString: { format: "%a", date: "$createdAt" }, 
       };
     } else if (range === "month") {
       groupBy = {
-        $dateToString: { format: "%d %b", date: "$createdAt" }, // 01 Jan
+        $dateToString: { format: "%d %b", date: "$createdAt" },
       };
     } else {
       groupBy = {
-        $dateToString: { format: "%b %Y", date: "$createdAt" }, // Jan 2025
+        $dateToString: { format: "%b %Y", date: "$createdAt" }, 
       };
     }
 
-    // ----- SALES GRAPH -----
+    
+    
     const salesChart = await Order.aggregate([
       { $match: { status: { $ne: "Cancelled" } } },
       {
@@ -226,7 +219,7 @@ const getDashboard = async (req, res) => {
       { $sort: { _id: 1 } },
     ]);
 
-    // ----- TOP PRODUCTS -----
+
     const topProducts = await Order.aggregate([
       { $unwind: "$items" },
       {
@@ -242,7 +235,6 @@ const getDashboard = async (req, res) => {
       { $limit: 5 },
     ]);
 
-    // ----- RECENT ORDERS -----
     const recentOrders = await Order.find()
       .populate("userId", "name")
       .populate("items.productId", "name")

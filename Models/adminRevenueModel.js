@@ -17,19 +17,16 @@ const adminRevenueSchema = new Schema(
       index: true
     },
 
-    // 💰 PLATFORM COMMISSION
     amount: {
       type: Number,
       required: true
     },
 
-    // optional: helps in analytics
     currency: {
       type: String,
       default: "INR"
     },
 
-    // refund / reversal support
     type: {
       type: String,
       enum: ["order", "refund"],

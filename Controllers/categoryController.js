@@ -1,7 +1,7 @@
 const Category= require("../Models/categoryModel")
 const cloudinary= require("../Config/cloudinary")
 const streamifier=require("streamifier")
-const { uploadBufferToCloudinary} = require("../Utils/cloudinaryHelper"); // see helper below
+const { uploadBufferToCloudinary} = require("../Utils/cloudinaryHelper"); 
 
 
 const createCategory = async (req, res) => {
@@ -16,7 +16,6 @@ const createCategory = async (req, res) => {
       return res.status(400).json({ message: "Category name is not provided" });
     }
 
-    // case-insensitive exact match (safer)
     const existing = await Category.findOne({
       name: { $regex: `^${escapeRegExp(name)}$`, $options: "i" }
     });
@@ -32,7 +31,6 @@ console.log("cloudinary keys:", cloudinary && Object.keys(cloudinary).slice(0,20
 console.log("cloudinary.uploader:", cloudinary && cloudinary.uploader);
     if (req.file && req.file.buffer) {
       const publicIdSafe = name.toLowerCase().replace(/[^a-z0-9\-]/g, "-").substring(0, 200);
-      // make sure uploadBufferToCloudinary returns a promise and we await it
       const result = await uploadBufferToCloudinary(req.file.buffer, publicIdSafe);
       imageUrl = result?.secure_url || result?.url || "";
     }
@@ -73,7 +71,7 @@ const getCategoriesUser=async (req, res) => {
   try {
     const categories = await Category.find({ isActive: true })
       .sort({ createdAt: -1 })
-      .select("_id name image") // only what public UI needs
+      .select("_id name image") 
       .lean();
     return res.json({ success: true, categories });
   } catch (error) {
@@ -105,13 +103,11 @@ const updateCategory = async (req, res) => {
     const category = await Category.findById(id);
     if (!category) return res.status(404).json({ success: false, message: "Category not found" });
 
-    // normalize fields
     const nameRaw = req.body.name;
     if (typeof nameRaw === "string") {
       const name = nameRaw.trim();
       if (!name) return res.status(400).json({ success: false, message: "Name cannot be empty" });
 
-      // check duplicates excluding current doc (case-insensitive exact)
       const dup = await Category.findOne({
         name: { $regex: `^${escapeRegExp(name)}$`, $options: "i" },
         _id: { $ne: id },
@@ -127,18 +123,15 @@ const updateCategory = async (req, res) => {
     }
 
     if (typeof req.body.isActive !== "undefined") {
-      // allow string "true"/"false" etc.
       const val = req.body.isActive;
       category.isActive = val === "true" || val === true ? true : val === "false" || val === false ? false : category.isActive;
     }
 
-    // If new file provided, upload and replace image URL
     if (req.file && req.file.buffer) {
       const publicIdSafe = (category.name || "category").toLowerCase().replace(/[^a-z0-9\-]/g, "-").substring(0, 200);
       const result = await uploadBufferToCloudinary(req.file.buffer, publicIdSafe);
       const imageUrl = result?.secure_url || result?.url || "";
-      // OPTIONAL: delete old Cloudinary public_id if you store it separately
-      // e.g. if you saved public_id in model, call cloudinary.uploader.destroy(oldPublicId)
+    
       category.image = imageUrl;
     }
 
