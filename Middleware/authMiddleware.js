@@ -17,7 +17,6 @@ const protect=async(req,res,next)=>{
             email:decoded.email,
             role:decoded.role
         }
-        console.log(req.user)
         next()
     }catch(error){
         console.error("Auth error:", error.message);
@@ -26,6 +25,7 @@ const protect=async(req,res,next)=>{
 }
 
 const isAdmin=(req,res,next)=>{
+   
     if(req.user && req.user.role ==="admin"){
         return next();
     }

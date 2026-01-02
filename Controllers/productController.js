@@ -223,6 +223,19 @@ const listProducts = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
+const listProductsUser = async (req, res) => {
+  try {
+    const products = await Product.find({isActive:true})
+      .sort({ createdAt: -1 })
+      .populate("category", "name") 
+      .lean();
+    return res.json({ success: true, products });
+  } catch (err) {
+    console.error("listProducts error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
 
 const getProduct = async (req, res) => {
   const { slug } = req.params;
@@ -436,5 +449,6 @@ module.exports = {
   getProduct,
   updateProduct,
   toggleProduct,
-  getShopProducts
+  getShopProducts,
+  listProductsUser
 };
