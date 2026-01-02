@@ -60,8 +60,8 @@ const sendOtp = async (req, res) => {
 
     const subject =
       purpose === "reset"
-        ? "Reset your Leather Haven password"
-        : "Your Leather Haven verification code";
+        ? "Reset your Fresh Mart password"
+        : "Your Fresh Mart verification code";
 
     const html =
       purpose === "reset"
