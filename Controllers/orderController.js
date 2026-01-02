@@ -23,6 +23,27 @@ const createOrder = async (req, res) => {
     /* ------------------ FETCH CART ------------------ */
     const cart = await Cart.findOne({ user: userId });
     console.log(cart)
+    /* ----------- STRICT VALIDATION (DO NOT REMOVE) ----------- */
+
+// Phone must be 10 digits
+if (!/^\d{10}$/.test(address.phone)) {
+  return res.status(400).json({ message: "Invalid phone number" });
+}
+
+// Postal code should be numeric
+if (!/^\d{5,6}$/.test(address.postalCode)) {
+  return res.status(400).json({ message: "Invalid postal code" });
+}
+
+// Prevent empty strings / whitespace abuse
+if (
+  !address.fullName.trim() ||
+  !address.line1.trim() ||
+  !address.city.trim() ||
+  !address.state.trim()
+) {
+  return res.status(400).json({ message: "Address fields cannot be empty" });
+}
 
     if (!cart) {
       return res.status(400).json({ message: "Cart not found" });
