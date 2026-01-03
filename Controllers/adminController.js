@@ -192,33 +192,78 @@ const getDashboard = async (req, res) => {
     const totalRevenue = revenueAgg[0]?.total || 0;
 
     let groupBy;
+    let sortKey;
+
+    /* ---------- RANGE LOGIC ---------- */
+
     if (range === "week") {
+      // Monday → Sunday
       groupBy = {
-        $dateToString: { format: "%a", date: "$createdAt" }, 
+        day: { $isoDayOfWeek: "$createdAt" }, // 1 (Mon) → 7 (Sun)
+        label: {
+          $dateToString: { format: "%a", date: "$createdAt" },
+        },
       };
-    } else if (range === "month") {
-      groupBy = {
-        $dateToString: { format: "%d %b", date: "$createdAt" },
-      };
-    } else {
-      groupBy = {
-        $dateToString: { format: "%b %Y", date: "$createdAt" }, 
-      };
+      sortKey = "day";
     }
 
-    
-    
+    else if (range === "month") {
+      // Prevent cross-month mixing
+      groupBy = {
+        day: { $dayOfMonth: "$createdAt" },
+        month: { $month: "$createdAt" },
+        year: { $year: "$createdAt" },
+        label: {
+          $dateToString: { format: "%d %b", date: "$createdAt" },
+        },
+      };
+      sortKey = ["year", "month", "day"];
+    }
+
+    else {
+      // Year view
+      groupBy = {
+        month: { $month: "$createdAt" },
+        year: { $year: "$createdAt" },
+        label: {
+          $dateToString: { format: "%b %Y", date: "$createdAt" },
+        },
+      };
+      sortKey = ["year", "month"];
+    }
+
+    /* ---------- SALES CHART ---------- */
+
     const salesChart = await Order.aggregate([
       { $match: { status: { $ne: "Cancelled" } } },
+
       {
         $group: {
           _id: groupBy,
           revenue: { $sum: "$totalAmount" },
         },
       },
-      { $sort: { _id: 1 } },
+
+      {
+        $sort:
+          Array.isArray(sortKey)
+            ? sortKey.reduce((acc, k) => {
+                acc[`_id.${k}`] = 1;
+                return acc;
+              }, {})
+            : { [`_id.${sortKey}`]: 1 },
+      },
+
+      {
+        $project: {
+          _id: 0,
+          label: "$_id.label",
+          revenue: 1,
+        },
+      },
     ]);
 
+    /* ---------- TOP PRODUCTS ---------- */
 
     const topProducts = await Order.aggregate([
       { $unwind: "$items" },
@@ -234,6 +279,8 @@ const getDashboard = async (req, res) => {
       { $sort: { revenue: -1 } },
       { $limit: 5 },
     ]);
+
+    /* ---------- RECENT ORDERS ---------- */
 
     const recentOrders = await Order.find()
       .populate("userId", "name")
@@ -251,6 +298,7 @@ const getDashboard = async (req, res) => {
       topProducts,
       recentOrders,
     });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Dashboard error" });

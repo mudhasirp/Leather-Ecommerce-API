@@ -4,7 +4,7 @@ const {getCategories,createCategory,toggleCategory,updateCategory}=require("../C
 const{createProduct,listProducts,updateProduct,toggleProduct}=require("../Controllers/productController")
 const upload=require("../Middleware/multer")
 const {isAdmin,protect}=require("../Middleware/authMiddleware")
-const{getAllOrders, updateOrderStatus}=require("../Controllers/orderController")
+const{getAllOrders, updateOrderStatus, getOrderByIdAdmin, getOrderInvoiceAdmin}=require("../Controllers/orderController")
 const router=express.Router()
 
 router.post("/login",adminLogin)
@@ -41,6 +41,7 @@ router.get("/customers", protect, isAdmin,getCustomers);
 router.get("/customers/:id", protect,isAdmin,getCustomerDetails);
 router.patch("/customers/:id/block", protect,isAdmin, toggleCustomerBlock);
 router.get("/dashboard",protect,isAdmin,getDashboard)
-
+router.get("/order-details/:id",protect,isAdmin,getOrderByIdAdmin)
+router.get("/orders/:id/invoice",protect,isAdmin,getOrderInvoiceAdmin)
 module.exports=router
 

@@ -3,7 +3,11 @@ const Cart = require("../Models/cartModel")
 const Product = require("../Models/productModel");
 const Enquiry=require("../Models/enquiryModel")
 const Address= require("../Models/addressModel")
+const mongoose=require("mongoose")
 const User=require("../Models/userModel")
+const pdfkit=require("pdfkit")
+const PDFDocument = require("pdfkit");
+
 const createOrder = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -192,30 +196,70 @@ const getOrderDetails = async (req, res) => {
     res.status(500).json({ message: "Failed to load order" });
   }
 };
+
 const createEnquiry = async (req, res) => {
   try {
     const userId = req.user.id;
     const { productId, message, phone } = req.body;
 
+    /* ---------------- BASIC VALIDATION ---------------- */
+
     if (!productId || !message || !phone) {
-      return res.status(400).json({ message: "Missing required fields" });
+      return res.status(400).json({
+        message: "Product, message, and phone are required",
+      });
     }
+
+    // Validate productId
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({
+        message: "Invalid product ID",
+      });
+    }
+
+    // Validate phone number (10 digits only)
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!phoneRegex.test(phone)) {
+      return res.status(400).json({
+        message: "Invalid phone number. Enter a 10-digit number",
+      });
+    }
+
+    // Validate message length
+    if (message.trim().length < 5) {
+      return res.status(400).json({
+        message: "Message must be at least 5 characters long",
+      });
+    }
+
+    /* ---------------- FETCH USER ---------------- */
 
     const user = await User.findById(userId).select("name");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const product = await Product.findById(productId).select("name mainImage");
+    /* ---------------- FETCH PRODUCT ---------------- */
+
+    const product = await Product.findById(productId).select(
+      "name mainImage"
+    );
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    const address = await Address.findOne({ user: userId, isDefault: true });
+    /* ---------------- FETCH ADDRESS ---------------- */
+
+    const address = await Address.findOne({
+      user: userId,
+      isDefault: true,
+    });
+
+    /* ---------------- CREATE ENQUIRY ---------------- */
 
     const enquiry = await Enquiry.create({
       user: userId,
-      username: user.name,                
+      username: user.name,
       userPhone: phone,
 
       userAddress: address
@@ -233,15 +277,116 @@ const createEnquiry = async (req, res) => {
         image: product.mainImage,
       },
 
-      message,
+      message: message.trim(),
       status: "New",
     });
 
-    res.status(201).json({ success: true, enquiry });
+    res.status(201).json({
+      success: true,
+      enquiry,
+    });
 
   } catch (err) {
     console.error("Create enquiry error:", err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: "Internal server error" });
   }
 };
-module.exports={createOrder,getAllOrders,updateOrderStatus,getMyOrders,getAllOrders,getOrderDetails,createEnquiry}
+
+const getOrderByIdAdmin = async (req, res) => {
+  const order = await Order.findById(req.params.id)
+    .populate("userId", "name email");
+
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
+  res.json(order);
+};
+
+
+const getOrderInvoiceAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const order = await Order.findById(id).populate(
+      "userId",
+      "name email"
+    );
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const doc = new PDFDocument({ margin: 40 });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename=invoice-${order._id}.pdf`
+    );
+
+    doc.pipe(res);
+
+    /* ---------------- HEADER ---------------- */
+    doc.fontSize(20).text("INVOICE", { align: "center" });
+    doc.moveDown();
+
+    doc.fontSize(12).text(`Order ID: ${order._id}`);
+    doc.text(`Date: ${order.createdAt.toDateString()}`);
+    doc.text(`Status: ${order.status}`);
+    doc.moveDown();
+
+    /* ---------------- CUSTOMER ---------------- */
+    doc.fontSize(14).text("Customer Details", { underline: true });
+    doc.fontSize(12).text(`Name: ${order.userId?.name || "N/A"}`);
+    doc.text(`Email: ${order.userId?.email || "N/A"}`);
+    doc.moveDown();
+
+    /* ---------------- ADDRESS ---------------- */
+    if (order.address) {
+      doc.fontSize(14).text("Delivery Address", { underline: true });
+      doc.fontSize(12).text(
+        `${order.address.line1}, ${order.address.line2 || ""}`
+      );
+      doc.text(
+        `${order.address.city}, ${order.address.state}`
+      );
+      doc.text(
+        `${order.address.postalCode}, ${order.address.country}`
+      );
+      if (order.address.phone) {
+        doc.text(`Phone: +91 ${order.address.phone}`);
+      }
+      doc.moveDown();
+    }
+
+    /* ---------------- ITEMS ---------------- */
+    doc.fontSize(14).text("Order Items", { underline: true });
+    doc.moveDown(0.5);
+
+    order.items.forEach((item, index) => {
+      doc.fontSize(12).text(
+        `${index + 1}. ${item.name}
+Qty: ${item.qty}
+Price: ₹${item.price}
+Total: ₹${item.qty * item.price}`
+      );
+      doc.moveDown(0.5);
+    });
+
+    /* ---------------- TOTAL ---------------- */
+    doc.moveDown();
+    doc
+      .fontSize(14)
+      .text(`Grand Total: ₹${order.totalAmount}`, {
+        align: "right",
+      });
+
+    doc.end();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Invoice generation failed" });
+  }
+};
+
+module.exports={createOrder,getAllOrders,updateOrderStatus,getMyOrders,getAllOrders,getOrderDetails,createEnquiry,getOrderByIdAdmin,getOrderInvoiceAdmin}
