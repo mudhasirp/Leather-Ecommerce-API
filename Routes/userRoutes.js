@@ -7,10 +7,10 @@ const{createOrder, getMyOrders, getOrderDetails,createEnquiry}=require("../Contr
 const {protect,isAdmin}=require("../Middleware/authMiddleware")
 const { getAddresses, updateAddress, createAddress, setDefaultAddress, deleteAddress } = require("../Controllers/addressController")
 
-router.get("/products",protect,listProducts)
-router.get("/products-user",protect,listProductsUser)
-router.get("/products/:slug",protect,getProduct)
-router.get("/categories",protect,getCategoriesUser)
+router.get("/products",listProducts)
+router.get("/products-user",listProductsUser)
+router.get("/products/:slug",getProduct)
+router.get("/categories",getCategoriesUser)
 router.get("/products-shop",protect,getShopProducts)
 router.get("/cart",protect,getCart)
 router.post("/cart/items",protect,addItem)
@@ -26,7 +26,7 @@ router.delete("/addresses/:id",protect,deleteAddress)
 router.get("/orders/my-orders",protect,getMyOrders)
 router.get("/orders/:id",protect,getOrderDetails)
 router.post("/enquiry",protect, createEnquiry);
-router.get("/products/related/:productId", protect,getRelatedProducts);
+router.get("/products/related/:productId",getRelatedProducts);
 
 
 module.exports=router

@@ -8,7 +8,7 @@ const{getAllOrders, updateOrderStatus, getOrderByIdAdmin, getOrderInvoiceAdmin}=
 const router=express.Router()
 
 router.post("/login",adminLogin)
-router.get("/categories",protect,  getCategories);
+router.get("/categories",  getCategories);
 router.post("/categories",protect, isAdmin, upload.single("image"), createCategory);
 router.patch("/categories/:id/toggle",protect,isAdmin, toggleCategory);
 router.put("/categories/:id",protect,isAdmin,upload.single("image"), updateCategory)
