@@ -44,6 +44,7 @@ const sendOtp = async (req, res) => {
     }
 
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    console.log(otp)
     const hashedPass = password ? await bcrypt.hash(password, 10) : null;
 
     await Otp.findOneAndUpdate(
@@ -69,6 +70,7 @@ const sendOtp = async (req, res) => {
         : getOtpEmailHtml({ name, otp });
 
     await sendEmail(email, subject, html);
+     console.log("done")
 
     return res.json({ success: true, message: "OTP sent successfully", email });
   } catch (error) {
