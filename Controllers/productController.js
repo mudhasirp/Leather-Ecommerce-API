@@ -236,6 +236,47 @@ const listProductsUser = async (req, res) => {
   }
 };
 
+ const getRelatedProducts = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const LIMIT = 4;
+
+    const currentProduct = await Product.findById(productId);
+    if (!currentProduct) {
+      return res.status(404).json({ success: false });
+    }
+
+    // 1️⃣ Same category first
+    let products = await Product.find({
+      category: currentProduct.category,
+      _id: { $ne: currentProduct._id },
+      isActive: true,
+    }).limit(LIMIT);
+
+    // 2️⃣ Fill remaining slots
+    if (products.length < LIMIT) {
+      const remaining = LIMIT - products.length;
+
+      const excludeIds = products.map(p => p._id);
+
+      const fallback = await Product.find({
+        _id: { $nin: [...excludeIds, currentProduct._id] },
+        isActive: true,
+      }).limit(remaining);
+
+      products = [...products, ...fallback];
+    }
+
+    res.json({
+      success: true,
+      products,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false });
+  }
+};
+
+
 
 const getProduct = async (req, res) => {
   const { slug } = req.params;
@@ -255,11 +296,20 @@ const getProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    console.log(id)
+    console.log(req.body)
 
     if (!mongoose.isValidObjectId(id)) {
       return res.status(400).json({ success: false, message: "Invalid product ID" });
     }
+    let existingImages = [];
+
+if (req.body.existingImages) {
+  existingImages =
+    typeof req.body.existingImages === "string"
+      ? JSON.parse(req.body.existingImages)
+      : req.body.existingImages;
+}
+
 
     const product = await Product.findById(id);
     if (!product) {
@@ -319,10 +369,8 @@ const updateProduct = async (req, res) => {
         newImages.push(uploaded.secure_url || uploaded.url);
       }
     }
+    product.images = [...existingImages, ...newImages];
 
-    if (newImages.length > 0) {
-      product.images = newImages;
-    }
 
     let parsedVariants = [];
     if (unitVariants) {
@@ -450,5 +498,6 @@ module.exports = {
   updateProduct,
   toggleProduct,
   getShopProducts,
-  listProductsUser
+  listProductsUser,
+  getRelatedProducts
 };

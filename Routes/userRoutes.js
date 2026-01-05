@@ -1,6 +1,6 @@
 const express=require("express")
 const router=express.Router()
-const {listProducts,getProduct,getShopProducts, listProductsUser}=require("../Controllers/productController")
+const {listProducts,getProduct,getShopProducts, listProductsUser, getRelatedProducts}=require("../Controllers/productController")
 const{getCategoriesUser}=require("../Controllers/categoryController")
 const {getCart,addItem,updateItemQty,removeItem,clearCart}=require("../Controllers/cartController")
 const{createOrder, getMyOrders, getOrderDetails,createEnquiry}=require("../Controllers/orderController")
@@ -26,6 +26,7 @@ router.delete("/addresses/:id",protect,deleteAddress)
 router.get("/orders/my-orders",protect,getMyOrders)
 router.get("/orders/:id",protect,getOrderDetails)
 router.post("/enquiry",protect, createEnquiry);
+router.get("/products/related/:productId", protect,getRelatedProducts);
 
 
 module.exports=router
