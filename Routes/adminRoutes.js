@@ -5,6 +5,7 @@ const{createProduct,listProducts,updateProduct,toggleProduct}=require("../Contro
 const upload=require("../Middleware/multer")
 const {isAdmin,protect}=require("../Middleware/authMiddleware")
 const{getAllOrders, updateOrderStatus, getOrderByIdAdmin, getOrderInvoiceAdmin}=require("../Controllers/orderController")
+const { createBanner, getAdminBanners } = require("../Controllers/bannerController")
 const router=express.Router()
 
 router.post("/login",adminLogin)
@@ -43,5 +44,14 @@ router.patch("/customers/:id/block", protect,isAdmin, toggleCustomerBlock);
 router.get("/dashboard",protect,isAdmin,getDashboard)
 router.get("/order-details/:id",protect,isAdmin,getOrderByIdAdmin)
 router.get("/orders/:id/invoice",protect,isAdmin,getOrderInvoiceAdmin)
+router.get("/banners", protect, isAdmin, getAdminBanners);
+router.post(
+  "/banners",
+  protect,
+  isAdmin,
+  upload.single("image"),
+  createBanner
+);
+
 module.exports=router
 

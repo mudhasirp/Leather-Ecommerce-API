@@ -6,6 +6,7 @@ const {getCart,addItem,updateItemQty,removeItem,clearCart}=require("../Controlle
 const{createOrder, getMyOrders, getOrderDetails,createEnquiry}=require("../Controllers/orderController")
 const {protect,isAdmin}=require("../Middleware/authMiddleware")
 const { getAddresses, updateAddress, createAddress, setDefaultAddress, deleteAddress } = require("../Controllers/addressController")
+const { getHomeBanners } = require("../Controllers/bannerController")
 
 router.get("/products",listProducts)
 router.get("/products-user",listProductsUser)
@@ -28,5 +29,6 @@ router.get("/orders/:id",protect,getOrderDetails)
 router.post("/enquiry",protect, createEnquiry);
 router.get("/products/related/:productId",getRelatedProducts);
 
+router.get("/banners", getHomeBanners);
 
 module.exports=router
