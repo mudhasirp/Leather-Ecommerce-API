@@ -130,6 +130,9 @@ const loginUser = async (req, res) => {
         if (!user || !(await user.matchPassword(password))) {
             return res.status(401).json({ message: "Invalid credentials " })
         }
+        if(user.isBlocked===true){
+          return res.status(401).json({message:"User is blocked by admin"})
+        }
         return sendTokens(user, res)
     } catch (err) {
         console.error("Login error", err.message);
